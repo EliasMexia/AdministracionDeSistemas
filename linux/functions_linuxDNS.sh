@@ -312,27 +312,23 @@ agregar_dominio() {
         return
     fi
 
-# =================================================================
+    # =================================================================
     # CANDADO DE IP: IMPIDE GUARDAR HASTA QUE SEA 100% VALIDA
     while true; do
         read -p "Ingresa la IP que resolverá este dominio (ej. 55.55.55.55): " IP_SERVIDOR
         
-        # 1. Bloquear si el usuario le da Enter sin escribir nada
         if [ -z "$IP_SERVIDOR" ]; then
             echo -e "\e[31m[ERROR] No puedes dejarlo vacío. Intenta de nuevo.\e[0m"
             continue
         fi
 
-        # 2. Bloquear IPs trampa explícitamente
         if [[ "$IP_SERVIDOR" == "0.0.0.0" || "$IP_SERVIDOR" == "127.0.0.1" || "$IP_SERVIDOR" == "255.255.255.255" ]]; then
             echo -e "\e[31m[ERROR] IP $IP_SERVIDOR NO permitida. Escribe una IP real.\e[0m"
             continue
         fi
 
-        # 3. Validar que tenga formato correcto y no pase de 255
         if [[ $IP_SERVIDOR =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
             if [[ ${BASH_REMATCH[1]} -le 255 && ${BASH_REMATCH[2]} -le 255 && ${BASH_REMATCH[3]} -le 255 && ${BASH_REMATCH[4]} -le 255 ]]; then
-                # ¡IP PERFECTA! Rompemos el ciclo y continuamos con el script
                 break 
             else
                 echo -e "\e[31m[ERROR] Ningún número de la IP puede ser mayor a 255.\e[0m"
@@ -343,7 +339,7 @@ agregar_dominio() {
     done
     # =================================================================
 
-    log_info "Declarando zona en $ZONAS_CONF..."
+    log_info "1. Declarando Zona Directa en $ZONAS_CONF..."
     cat <<EOF >> "$ZONAS_CONF"
 zone "$DOMINIO" {
     type master;
@@ -351,8 +347,7 @@ zone "$DOMINIO" {
 };
 EOF
 
-    log_info "Generando archivo de zona $ARCHIVO_ZONA sin intervención manual..."
-   
+    log_info "2. Generando archivo de Zona Directa ($ARCHIVO_ZONA)..."
     cat <<EOF > "$ARCHIVO_ZONA"
 \$TTL    604800
 @       IN      SOA     ns1.$DOMINIO. admin.$DOMINIO. (
@@ -368,7 +363,51 @@ ns1     IN      A       $IP_SERVIDOR
 www     IN      CNAME   $DOMINIO.
 EOF
 
-    log_ok "Zona y Registros (A y CNAME) creados exitosamente."
+    # =================================================================
+    # 3. CREACIÓN DE ZONA INVERSA (PTR) AUTOMÁTICA
+    # =================================================================
+    # Extraemos los octetos de la IP
+    IFS='.' read -r ip1 ip2 ip3 ip4 <<< "$IP_SERVIDOR"
+    
+    # Invertimos los 3 primeros octetos para el estándar in-addr.arpa
+    RED_INVERSA="${ip3}.${ip2}.${ip1}.in-addr.arpa"
+    ARCHIVO_ZONA_INVERSA="/var/cache/bind/db.${ip1}.${ip2}.${ip3}"
+
+    log_info "3. Declarando Zona Inversa ($RED_INVERSA)..."
+    # Solo la declara en named.conf.local si no existe aún
+    if ! grep -q "zone \"$RED_INVERSA\"" "$ZONAS_CONF"; then
+        cat <<EOF >> "$ZONAS_CONF"
+zone "$RED_INVERSA" {
+    type master;
+    file "$ARCHIVO_ZONA_INVERSA";
+};
+EOF
+    fi
+
+    log_info "4. Generando archivo PTR..."
+    # Si el archivo inverso no existe, creamos su cabecera SOA
+    if [ ! -f "$ARCHIVO_ZONA_INVERSA" ]; then
+        cat <<EOF > "$ARCHIVO_ZONA_INVERSA"
+\$TTL    604800
+@       IN      SOA     ns1.$DOMINIO. admin.$DOMINIO. (
+                              1         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@       IN      NS      ns1.$DOMINIO.
+EOF
+    fi
+    
+    # Inyectamos el registro PTR apuntando el último octeto de la IP hacia el dominio
+    # (Ojo: En BIND9 los dominios deben terminar con un punto final)
+    if ! grep -q "^$ip4 .* PTR .* $DOMINIO\.$" "$ARCHIVO_ZONA_INVERSA"; then
+        echo "$ip4      IN      PTR     $DOMINIO." >> "$ARCHIVO_ZONA_INVERSA"
+    fi
+    # =================================================================
+
+    log_ok "Zonas (Directa/Inversa) y Registros (A, CNAME, PTR) creados exitosamente."
     systemctl restart bind9
     read -p "Enter para continuar..."
 }
