@@ -237,17 +237,27 @@ monitorear_clientes() {
     read -p "Enter para continuar..."
 }
 
-verificar_estado() {
-    log_info "Estado ISC-DHCP-SERVER:"
-    systemctl status isc-dhcp-server --no-pager
-    echo ""
-    log_info "Estado BIND9 (DNS):"
-    if dpkg -s bind9 >/dev/null 2>&1; then
-        systemctl status bind9 --no-pager
+# --- VERIFICAR SERVICIOS ---
+verificar_servicios() {
+    clear
+    log_info "--- ESTADO DE LOS SERVICIOS ---"
+    
+    echo -n "1. Servidor DHCP (isc-dhcp-server): "
+    if systemctl is-active --quiet isc-dhcp-server; then
+        echo -e "\e[32m[CORRIENDO]\e[0m"
     else
-        log_warn "BIND9 no está instalado."
+        echo -e "\e[31m[DETENIDO / NO INSTALADO]\e[0m"
     fi
-    read -p "Enter para continuar..."
+    
+    echo -n "2. Servidor DNS (bind9): "
+    if systemctl is-active --quiet bind9; then
+        echo -e "\e[32m[CORRIENDO]\e[0m"
+    else
+        echo -e "\e[31m[DETENIDO / NO INSTALADO]\e[0m"
+    fi
+    
+    echo "-------------------------------------"
+    read -p "Enter para volver al menú..."
 }
 
 desinstalar_dhcp() {
@@ -357,6 +367,45 @@ eliminar_dominio() {
     else
         log_error "El dominio no existe en la configuración."
     fi
+    read -p "Enter para continuar..."
+}
+# --- GESTOR ABC: LISTAR DOMINIOS ACTIVOS ---
+listar_dominios() {
+    log_info "--- GESTOR ABC: CONSULTA DE DOMINIOS ACTIVOS ---"
+    
+    # Verificamos si BIND9 existe
+    if [ ! -f /etc/bind/named.conf.local ]; then
+        log_error "El servidor BIND9 no está instalado o configurado."
+        read -p "Enter para continuar..."
+        return
+    fi
+
+    # Contamos cuántas zonas hay registradas
+    TOTAL_DOMINIOS=$(grep -c "zone " /etc/bind/named.conf.local)
+    
+    if [ "$TOTAL_DOMINIOS" -eq 0 ]; then
+        echo -e "\n[INFO] No hay ningún dominio registrado actualmente en el servidor."
+    else
+        echo -e "\n=================================================="
+        printf "%-30s | %-15s\n" "DOMINIO" "IP DEL SERVIDOR"
+        echo "-------------------------------+------------------"
+        
+        # Extraemos los dominios y buscamos su IP en su archivo de configuración
+        grep "zone " /etc/bind/named.conf.local | awk -F'"' '{print $2}' | while read dominio; do
+            archivo_zona=$(grep -A 2 "zone \"$dominio\"" /etc/bind/named.conf.local | grep "file" | awk -F'"' '{print $2}')
+            
+            if [ -f "$archivo_zona" ]; then
+                # Busca el registro A principal (excluyendo el de www)
+                ip=$(grep -w "A" "$archivo_zona" | grep -v "www" | head -n 1 | awk '{print $NF}')
+                printf "%-30s | %-15s\n" "$dominio" "$ip"
+            else
+                printf "%-30s | %-15s\n" "$dominio" "[Error: Sin archivo]"
+            fi
+        done
+        echo "=================================================="
+    fi
+    
+    echo ""
     read -p "Enter para continuar..."
 }
 
