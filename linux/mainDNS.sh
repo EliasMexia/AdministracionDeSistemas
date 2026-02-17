@@ -28,7 +28,7 @@ submenu_dhcp() {
         case $OPCION_DHCP in
             1) instalar_dhcp ;;
             2) configurar_scope ;;
-            3) monitorear_leases ;;
+            3) monitorear_clientes ;;
             4) desinstalar_dhcp ;;
             5) break ;;
             *) echo "Opción no válida."; sleep 1 ;;

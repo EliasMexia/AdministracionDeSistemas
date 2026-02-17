@@ -49,10 +49,13 @@ pedir_ip_custom() {
                 # Reglas de IPs Prohibidas
                 if [[ "$ip_input" == "0.0.0.0" ]]; then
                     log_error "IP 0.0.0.0 no permitida."
+                    continue
                 elif [[ "$ip_input" == "127.0.0.1" ]]; then
                     log_error "IP 127.0.0.1 no permitida."
+                    continue
                 elif [[ "$ip_input" == "255.255.255.255" ]]; then
                     log_error "IP Broadcast Global no permitida."
+                    continue
                 else
                     echo "$ip_input"
                     return 0
@@ -309,7 +312,36 @@ agregar_dominio() {
         return
     fi
 
-    IP_SERVIDOR=$(pedir_ip_custom "Ingresa la IP que resolverá este dominio (IP de tu Servidor o Cliente)")
+# =================================================================
+    # CANDADO DE IP: IMPIDE GUARDAR HASTA QUE SEA 100% VALIDA
+    while true; do
+        read -p "Ingresa la IP que resolverá este dominio (ej. 55.55.55.55): " IP_SERVIDOR
+        
+        # 1. Bloquear si el usuario le da Enter sin escribir nada
+        if [ -z "$IP_SERVIDOR" ]; then
+            echo -e "\e[31m[ERROR] No puedes dejarlo vacío. Intenta de nuevo.\e[0m"
+            continue
+        fi
+
+        # 2. Bloquear IPs trampa explícitamente
+        if [[ "$IP_SERVIDOR" == "0.0.0.0" || "$IP_SERVIDOR" == "127.0.0.1" || "$IP_SERVIDOR" == "255.255.255.255" ]]; then
+            echo -e "\e[31m[ERROR] IP $IP_SERVIDOR NO permitida. Escribe una IP real.\e[0m"
+            continue
+        fi
+
+        # 3. Validar que tenga formato correcto y no pase de 255
+        if [[ $IP_SERVIDOR =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+            if [[ ${BASH_REMATCH[1]} -le 255 && ${BASH_REMATCH[2]} -le 255 && ${BASH_REMATCH[3]} -le 255 && ${BASH_REMATCH[4]} -le 255 ]]; then
+                # ¡IP PERFECTA! Rompemos el ciclo y continuamos con el script
+                break 
+            else
+                echo -e "\e[31m[ERROR] Ningún número de la IP puede ser mayor a 255.\e[0m"
+            fi
+        else
+            echo -e "\e[31m[ERROR] Formato inválido. Escribe 4 números separados por puntos.\e[0m"
+        fi
+    done
+    # =================================================================
 
     log_info "Declarando zona en $ZONAS_CONF..."
     cat <<EOF >> "$ZONAS_CONF"
