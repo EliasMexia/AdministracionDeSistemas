@@ -1,96 +1,81 @@
 #!/bin/bash
-# Archivo: main.sh
-# Descripción: Script principal y punto de entrada único (Práctica 4)
+# Script principal - Practica 4
 
-# --- 1. IMPORTACIÓN DE LIBRERÍAS (MODULARIZACIÓN) ---
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$DIR/funciones_core.sh"
-source "$DIR/funciones_practica1.sh"
-source "$DIR/funciones_ssh.sh"
-source "$DIR/funciones_dhcp.sh"
-source "$DIR/funciones_dns.sh"
+# Importar modulos
+source ./funciones_core.sh
+source ./funciones_practica1.sh
+source ./funciones_dhcp.sh
+source ./funciones_dns.sh
+source ./funciones_ssh.sh
 
-# --- 2. VALIDACIONES DE SEGURIDAD ---
+# Validar permisos root
 check_root
 
-# --- 3. HITO CRÍTICO (Práctica 4): Habilitar SSH al arranque ---
-configurar_ssh
+clear
+echo "======================================================="
+echo " MENU DE ADMINISTRACION "
+echo "======================================================="
+echo "1) Configurar Servidor (Ejecutar en Debian local)"
+echo "2) Administrar Cliente (Ejecutar por SSH)"
+echo "======================================================="
+read -p "Elige una opcion [1-2]: " MODO
 
-# --- 4. INTEGRACIÓN DE SUBMENÚS ---
-submenu_dhcp() {
-    while true; do
-        clear
-        echo "=================================================="
-        echo "             SUBMENÚ: CONFIGURAR DHCP             "
-        echo "=================================================="
-        echo "1. Instalar Servidor DHCP"
-        echo "2. Configurar Scope (Red + DHCP)"
-        echo "3. Monitorear clientes (Leases)"
-        echo "4. Desinstalar DHCP"
-        echo "5. Volver al Menú Principal"
-        echo "=================================================="
-        read -p "Selecciona una opción: " OPCION_DHCP
-
-        case $OPCION_DHCP in
-            1) instalar_dhcp ;;
-            2) configurar_scope ;;
-            3) monitorear_clientes ;;
-            4) desinstalar_dhcp ;;
-            5) break ;;
-            *) echo "Opción no válida."; sleep 1 ;;
-        esac
-    done
-}
-
-submenu_dns() {
-    while true; do
-        clear
-        echo "=================================================="
-        echo "             SUBMENÚ: CONFIGURAR DNS              "
-        echo "=================================================="
-        echo "1. Instalar Servidor DNS (BIND9)"
-        echo "2. Gestor ABC: Agregar nuevo Dominio"
-        echo "3. Gestor ABC: Eliminar Dominio"
-        echo "4. Gestor ABC: Listar Dominios Activos"
-        echo "5. Validar Sintaxis y Pruebas DNS"
-        echo "6. Desinstalar DNS"
-        echo "7. Volver al Menú Principal"
-        echo "=================================================="
-        read -p "Selecciona una opción: " OPCION_DNS
-
-        case $OPCION_DNS in
-            1) instalar_dns ;;
-            2) agregar_dominio ;;
-            3) eliminar_dominio ;;
-            4) listar_dominios ;;
-            5) validar_dns ;;
-            6) desinstalar_dns ;;
-            7) break ;;
-            *) echo "Opción no válida."; sleep 1 ;;
-        esac
-    done
-}
-
-# --- 5. MENÚ PRINCIPAL ---
-while true; do
+if [ "$MODO" == "1" ]; then
     clear
-    echo "=================================================="
-    echo "         GESTOR UNIFICADO (DHCP, DNS, SSH)        "
-    echo "=================================================="
-    echo "1. Práctica 1: Estado del Sistema"
-    echo "2. Práctica 2: Configurar DHCP"
-    echo "3. Práctica 3: Configurar DNS"
-    echo "4. Verificar estado de los servicios (DHCP/DNS)"
-    echo "5. Salir"
-    echo "=================================================="
-    read -p "Selecciona una opción: " OPCION_MAIN
+    echo "[*] Configurando servidor..."
+    configurar_ssh
+    
+    IP_ACTUAL=$(hostname -I | awk '{print $1}')
+    echo -e "\n======================================================="
+    echo -e "\e[1;32m[+] SERVIDOR LISTO\e[0m"
+    echo "======================================================="
+    echo "Minimiza esta ventana y conectate desde tu maquina fisica con:"
+    echo -e "\n   \e[1;36mssh root@$IP_ACTUAL\e[0m\n"
+    echo "Despues vuelve a ejecutar ./main.sh y elige la opcion 2."
+    echo "======================================================="
+    exit 0
 
-    case $OPCION_MAIN in
-        1) verificar_estado ;;
-        2) submenu_dhcp ;;
-        3) submenu_dns ;;
-        4) verificar_servicios ;;
-        5) echo -e "\nSaliendo del Gestor. ¡Hasta pronto!\n"; exit 0 ;;
-        *) echo "Opción no válida."; sleep 1 ;;
-    esac
-done
+elif [ "$MODO" == "2" ]; then
+    # Revisar si se esta ejecutando desde SSH
+    if [ -z "$SSH_CLIENT" ] && [ -z "$SSH_TTY" ]; then
+        echo -e "\e[31m[AVISO] No estas conectado por SSH.\e[0m"
+        read -p "Presiona Enter para continuar de todos modos..."
+    fi
+
+    # Ciclo del menu principal
+    while true; do
+        clear
+        echo "========================================="
+        echo " PANEL CENTRAL (SSH)   "
+        echo "========================================="
+        echo "1) Estado del Sistema"
+        echo "2) DHCP"
+        echo "3) DNS"
+        echo "4) Validar Red"
+        echo "5) Salir"
+        echo "========================================="
+        read -p "Elige una opcion [1-5]: " OPCION
+
+        case $OPCION in
+            1) menu_practica1 ;;
+            2) 
+               echo "--- DHCP ---"
+               # instalar_dhcp
+               # configurar_dhcp
+               read -p "Enter para volver..."
+               ;;
+            3) 
+               echo "--- DNS ---"
+               # instalar_dns
+               # agregar_dominio
+               read -p "Enter para volver..."
+               ;;
+            4) validar_dns ;;
+            5) echo "Saliendo..."; exit 0 ;;
+            *) echo "Opcion invalida"; sleep 2 ;;
+        esac
+    done
+else
+    echo "Opcion no valida. Saliendo..."
+    exit 1
+fi
