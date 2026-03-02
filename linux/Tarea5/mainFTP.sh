@@ -29,7 +29,7 @@ sudo bash -c 'cat > /etc/vsftpd.conf' <<EOF
 # Usuarios locales
 local_enable=YES
 write_enable=YES
-local_umask=022
+local_umask=002
 dirmessage_enable=YES
 use_localtime=YES
 xferlog_enable=YES
@@ -61,19 +61,22 @@ sudo groupadd -f reprobados
 sudo groupadd -f recursadores
 
 # Permisos
-echo " Configurando permisos y ACLs base..."
-# Permisos para general (SGID activado con 2775 para herencia)
-sudo chmod 2775 /srv/ftp/grupos/general
-sudo chown root:ftp /srv/ftp/grupos/general
-sudo setfacl -d -m u::rwx /srv/ftp/grupos/general
-sudo setfacl -d -m g::r-x /srv/ftp/grupos/general
-sudo setfacl -d -m o::r-x /srv/ftp/grupos/general
+echo " Configurando permisos y ACLs base con herencia..."
 
-# Permisos de carpetas de grupos
-sudo chmod 770 /srv/ftp/grupos/reprobados
+# Permisos para general (SGID 2777: Todos pueden escribir, y heredan permisos)
+sudo chmod 2777 /srv/ftp/grupos/general
+sudo chown root:ftp /srv/ftp/grupos/general
+# El flag '-d' (default) obliga a que todo lo nuevo herede lectura, escritura y ejecución
+sudo setfacl -d -m u::rwx,g::rwx,o::rwx /srv/ftp/grupos/general
+
+# Permisos de carpetas de grupos (SGID 2770: Solo dueño y grupo pueden escribir)
+sudo chmod 2770 /srv/ftp/grupos/reprobados
 sudo chown root:reprobados /srv/ftp/grupos/reprobados
-sudo chmod 770 /srv/ftp/grupos/recursadores
+sudo setfacl -d -m u::rwx,g::rwx,o::--- /srv/ftp/grupos/reprobados
+
+sudo chmod 2770 /srv/ftp/grupos/recursadores
 sudo chown root:recursadores /srv/ftp/grupos/recursadores
+sudo setfacl -d -m u::rwx,g::rwx,o::--- /srv/ftp/grupos/recursadores
 
 # Montar carpeta general para anónimos
 echo " Configurando acceso para usuarios anónimos..."
