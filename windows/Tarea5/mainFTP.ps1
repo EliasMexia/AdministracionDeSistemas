@@ -129,7 +129,6 @@ while ($true) {
             EliminarUsuarioFTP
         }
         "4" {
-            Write-Host "Cerrando el script. Exito con la practica."
             exit
         }
         default {

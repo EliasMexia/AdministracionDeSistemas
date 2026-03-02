@@ -200,11 +200,15 @@ function EliminarUsuarioFTP {
     $ADSI = [ADSI]"WinNT://$env:ComputerName"
     $ADSI.Delete("User", $FTPUserName)
 
-    # Eliminar estructura de carpetas y enlaces
+    # Eliminar estructura de carpetas y enlaces (Blindado)
     $UserPath = "C:\FTP\LocalUser\$FTPUserName"
     if (Test-Path $UserPath) {
-        Remove-Item $UserPath -Recurse -Force
+        # Usamos rmdir nativo para barrer la carpeta y sus enlaces sin preguntar
+        cmd /c "rmdir /S /Q `"$UserPath`"" 2>$null
     }
 
-    Write-Host "Usuario $FTPUserName eliminado completamente del servidor."
+    # Opcional: Refrescar el servicio FTP por si el usuario estaba conectado
+    Restart-Service ftpsvc -Force
+
+    Write-Host "Usuario $FTPUserName y sus carpetas locales eliminados completamente."
 }
