@@ -18,35 +18,32 @@ while true; do
     echo "1. Apache2"
     echo "2. Nginx"
     echo "3. Tomcat"
-    echo "4. Salir"
-    read -p "Selecciona el servicio a instalar (1-4): " opcion
+    echo "4. Limpiar entorno (Liberar puertos)"
+    echo "5. Salir"
+    read -p "Selecciona una opción (1-5): " opcion
 
-    if [[ "$opcion" == "4" ]]; then
+    if [[ "$opcion" == "5" ]]; then
         echo "Saliendo del instalador..."
         break
+    elif [[ "$opcion" == "4" ]]; then
+        liberar_entorno
+        continue
     fi
 
     # Mapeo de la selección al nombre del servicio
     case $opcion in
         1) servicio="apache2" ;;
         2) servicio="nginx" ;;
-        3) servicio="tomcat9" ;; # Usamos tomcat9 como base en repositorios Debian
+        3) servicio="tomcat10" ;;
         *) echo "Opción inválida."; continue ;;
     esac
 
-    # Validar puerto con expresiones regulares (solo números)
-    read -p "Ingresa el puerto de escucha (ej. 80, 8080): " puerto
-    if ! [[ "$puerto" =~ ^[0-9]+$ ]] || [ "$puerto" -lt 1 ] || [ "$puerto" -gt 65535 ]; then
-        echo "Error: El puerto debe ser un número válido entre 1 y 65535."
-        continue
-    fi
+    # Llamada a la función de puerto validada
+    puerto=$(solicitarPuerto)
 
-    if puerto_en_uso "$puerto"; then
-        echo "Error: El puerto $puerto ya está ocupado por otro servicio."
-        continue
-    fi
-
-    echo "Consultando versiones disponibles en los repositorios de Debian..."
+    echo "Consultando versiones disponibles para $servicio..."
+    
+   echo "Consultando versiones disponibles en los repositorios de Debian..."
     version_elegida=$(seleccionar_version "$servicio")
 
     if [[ -z "$version_elegida" ]]; then
@@ -58,10 +55,10 @@ while true; do
     case $servicio in
         "apache2") instalar_apache "$version_elegida" "$puerto" ;;
         "nginx")   instalar_nginx "$version_elegida" "$puerto" ;;
-        "tomcat9") instalar_tomcat "$version_elegida" "$puerto" ;;
+        "tomcat10") instalar_tomcat "$version_elegida" "$puerto" ;;
     esac
 
-    read -p "¿Deseas instalar otro servicio? (s/n): " continuar
+    read -p "¿Deseas realizar otra acción? (s/n): " continuar
     if [[ "$continuar" != "s" && "$continuar" != "S" ]]; then
         break
     fi
